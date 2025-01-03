@@ -1,0 +1,6 @@
+------epoch 0
+step 20,loss 12.175946235656738
+step 40,loss 4.851377487182617
+step 60,loss 4.169032096862793
+execute time is 22 s
+,
