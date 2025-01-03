@@ -9,8 +9,6 @@ import tensorflow.compat.v1 as tf
 tf.disable_eager_execution()
 tf.disable_v2_behavior()
 
-
-
 def main(_):
     # 如果不存在,创建文件
     dir_path = './ckpt/ner-cws-2025-01-03'

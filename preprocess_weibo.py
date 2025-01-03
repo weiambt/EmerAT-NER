@@ -5,7 +5,7 @@ import re
 
 rNUM = '(-|\+)?\d+((\.)\d+)?%?'
 rENG = '[A-Za-z_.]+'
-# 词嵌入的numpy向量
+# 词嵌入的numpy向量：weibo_vector.npy
 vector = []
 word2id = {}
 id2word = {}
