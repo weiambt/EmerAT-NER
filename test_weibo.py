@@ -1,11 +1,21 @@
 import tensorflow.compat.v1 as tf
 import numpy as np
-import Weibo_model
+from model import mtl_model
 import os
 import preprocess_weibo
 import tensorflow_addons as tfa
 
 # tf.disable_eager_execution()
+
+# 旧写法
+# output_file='./ckpt/output_weibo.txt'
+# model_location='./ckpt/lstm+crf' + '-' + str(k)
+
+# 新写法
+dir_path = './ckpt/ner-cws-2025-01-03'
+model_name='model-19000'
+model_location='{}/{}'.format(dir_path,model_name)
+output_file='{}/decode_output.txt'.format(dir_path)
 
 def get_ner_fmeasure(golden_lists, predict_lists, label_type="BIO"):
     sent_num = len(golden_lists)
@@ -215,8 +225,8 @@ def main(_):
             # Todo 指定参数k是执行step
             # k=4440
             # k=40
-            k=2040
-            saver.restore(sess, './ckpt/lstm+crf' + '-' + str(k))
+            # k=2040
+            saver.restore(sess,model_location)
             results=[]
             for j in range(len(test_word)//setting.batch_size):
                 word_batch=test_word[j*setting.batch_size:(j+1)*setting.batch_size]
@@ -232,7 +242,7 @@ def main(_):
 
                 result_batch=evaluate(viterbi_sequences,label_batch,length_batch,word_batch)
                 results.append(result_batch)
-            print ('current_step:%s  The result is:'%(k))
+            print ('current_step:%s  The result is:')
             compute_f1(results)
 
 if __name__ == "__main__":

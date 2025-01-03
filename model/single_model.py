@@ -22,13 +22,13 @@ class Setting(object):
         self.out_keep_prob=0.6
         self.batch_size=20
         self.clip=5
-        self.num_epoches=300
+        self.num_epoches=1
         self.adv_weight=0.06
         self.task_num=2
         self.ner_tags_num=9
         self.cws_tags_num=4
 
-class TransferModel(object):
+class Model(object):
     def __init__(self,setting,word_embed,adv,is_train):
         self.lr = setting.lr
         self.word_dim = setting.word_dim
@@ -115,7 +115,7 @@ class TransferModel(object):
             outputs = self.normalize(outputs)
         return outputs
 
-    def multi_task(self):
+    def single_task(self):
         input = tfv2.nn.embedding_lookup(self.embedding, self.input)
         if self.is_train:
             input=tfv2.nn.dropout(input,self.keep_prob)
@@ -140,24 +140,6 @@ class TransferModel(object):
             # max_pool_output = tf.nn.max_pool(shared_output1, ksize=[1, self.num_steps, 1, 1],
             #                                strides=[1, self.num_steps, 1, 1], padding='SAME')
             # max_pool_output = tf.reshape(max_pool_output, [-1, 2 * self.lstm_dim])
-
-        with tf.variable_scope('cws_private_bilstm'):
-            cws_private_output = tfv2.keras.layers.Bidirectional(
-                tfv2.keras.layers.LSTM(self.lstm_dim, return_sequences=True, dropout=1 - self.in_keep_prob)
-            )(input)
-            cws_private_output = self.self_attention(cws_private_output)
-
-            # cws_private_cell_fw = tf.contrib.rnn.LSTMCell(self.lstm_dim)
-            # cws_private_cell_bw = tf.contrib.rnn.LSTMCell(self.lstm_dim)
-            # if self.is_train:
-            #     cws_private_cell_fw = tf.nn.rnn_cell.DropoutWrapper(cws_private_cell_fw, input_keep_prob=self.in_keep_prob,
-            #                                                    output_keep_prob=self.out_keep_prob)
-            #     cws_private_cell_bw = tf.nn.rnn_cell.DropoutWrapper(cws_private_cell_bw, input_keep_prob=self.in_keep_prob,
-            #                                                    output_keep_prob=self.out_keep_prob)
-            # (output_fw, output_bw), _ = tf.nn.bidirectional_dynamic_rnn(
-            #     cws_private_cell_fw, cws_private_cell_bw, input, sequence_length=self.sent_len, dtype=tf.float32)
-            # cws_private_output = tf.concat([output_fw, output_bw], axis=-1)
-            # cws_private_output=self.self_attention(cws_private_output)
 
         with tf.variable_scope('ner_private_bilstm'):
             ner_private_output = tfv2.keras.layers.Bidirectional(
@@ -213,51 +195,9 @@ class TransferModel(object):
         #                                                                       sequence_lengths=self.sent_len)
         # self.ner_loss=tf.reduce_mean(-log_likelihood)
 
-
-        # todo 测试NER中，待释放
-        # CWS CRF
-        output = tfv2.concat([cws_private_output,shared_output],axis=-1)
-        output = tfv2.reshape(output,[-1, 4 * self.lstm_dim])
-        W_cws = tfv2.keras.layers.Dense(self.lstm_dim, activation="tanh", name="W_cws")
-        hidden_output_cws = W_cws(output)
-        if self.is_train:
-            hidden_output_cws = tfv2.keras.layers.Dropout(rate=1 - self.keep_prob1)(hidden_output_cws)
-        logits_W_cws = tfv2.keras.layers.Dense(self.cws_tags_num, name="logits_W_cws")
-        cws_logits = logits_W_cws(hidden_output_cws)
-        self.cws_project_logits = tf.reshape(cws_logits, [-1, self.num_steps, self.cws_tags_num])
-        with tf.variable_scope('cws_crf'):
-            print(self.cws_project_logits.shape)
-            print(self.label_.shape)
-            print(self.sent_len.shape)
-
-            cws_crf_loss, self.cws_trans_params = tfa.text.crf_log_likelihood(self.cws_project_logits, self.label_, self.sent_len)
-            self.cws_loss = tf.reduce_mean(-cws_crf_loss)
-
-
-        # output = tf.concat([cws_private_output, shared_output],axis=-1)
-        # output = tf.reshape(output, [-1, 4 * self.lstm_dim])
-        # W_cws = tf.get_variable(name='W_cws', shape=[4 * self.lstm_dim, self.lstm_dim], dtype=tf.float32,
-        #                         initializer=tf.contrib.layers.xavier_initializer())
-        # b_cws = tf.get_variable(name='b_cws', shape=[self.lstm_dim], dtype=tf.float32,
-        #                         initializer=tf.contrib.layers.xavier_initializer())
-        # hidden_output = tf.tanh(tf.nn.xw_plus_b(output, W_cws, b_cws))
-        # if self.is_train:
-        #     hidden_output = tf.nn.dropout(hidden_output, self.keep_prob1)
-        # logits_W_cws = tf.get_variable(name='cws_weight', shape=[self.lstm_dim, self.cws_tags_num], dtype=tf.float32)
-        # logits_b_cws = tf.get_variable(name='cws_bias', shape=[self.cws_tags_num], dtype=tf.float32)
-        # pred = tf.nn.xw_plus_b(hidden_output, logits_W_cws, logits_b_cws)
-        # self.cws_project_logits = tf.reshape(pred, [-1, self.num_steps, self.cws_tags_num])
-        # with tf.variable_scope('cws_crf'):
-        #     log_likelihood, self.cws_trans_params = tf.contrib.crf.crf_log_likelihood(inputs=self.cws_project_logits,
-        #                                                                       tag_indices=self.label_,
-        #                                                                       sequence_lengths=self.sent_len)
-        # self.cws_loss = tf.reduce_mean(-log_likelihood)
-
         # todo 为了单个任务能执行成功，这里设置成0
         # self.cws_loss = tf.constant(0.0)
-        # self.ner_loss = tf.constant(0.0)
 
-
-        self.adv_loss = self.adversarial_loss(max_pool_output)
-        self.loss=tf.cast(self.is_ner,tf.float32)*self.ner_loss+tf.cast((1-self.is_ner),tf.float32)*self.cws_loss+self.adv_weight*self.adv_loss
+        # self.adv_loss = self.adversarial_loss(max_pool_output)
+        self.loss = self.ner_loss
 

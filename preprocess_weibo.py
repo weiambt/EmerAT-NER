@@ -1,5 +1,5 @@
 import numpy as np
-import Weibo_model
+from model import mtl_model
 import codecs
 import re
 
@@ -229,7 +229,7 @@ def id_to_tag(x):
 def id_to_word(x):
     return id2word[x]
 
-setting=Weibo_model.Setting()
+setting= Weibo_model.Setting()
 load_embedding(setting)
 process_train_data(setting)
 process_test_data(setting)
