@@ -13,7 +13,7 @@ import tensorflow_addons as tfa
 
 # 新写法
 dir_path = './ckpt/ner-cws-2025-01-03'
-model_name='model-19000'
+model_name='model-40'
 model_location='{}/{}'.format(dir_path,model_name)
 output_file='{}/decode_output.txt'.format(dir_path)
 
@@ -138,7 +138,6 @@ def evaluate(pred_batch,label_batch,length_batch,word_batch):
     return result_batch
 
 def compute_f1(results):
-    output_file='./data/output_weibo.txt'
     with open(output_file,'w') as f:
         to_write=[]
         for batch in results:
@@ -147,7 +146,6 @@ def compute_f1(results):
                     to_write.append(word+'\n')
                 to_write.append('\n')
         f.writelines(to_write)
-    f.close()
     gold_label=[]
     gold_label.append([])
     predict_label=[]
@@ -176,12 +174,11 @@ def compute_f1(results):
         predict_label.remove([])
 
     ACC,P,R,F=get_ner_fmeasure(gold_label,predict_label)
-    # tempstr = "ACC {},P {},R {},F {}".format(ACC, P, R, F)
-    # print(tempstr)
-    print('accuracy:',ACC)
-    print('precision:',P)
-    print('recall:',R)
-    print('fmeasure:',F)
+    tempstr = "accuracy {} \n precision {} \n recall {} \n F1 {}\n".format(ACC, P, R, F)
+    print(tempstr)
+    with open(output_file,'a+') as f:
+        f.write(tempstr)
+
 
 def main(_):
     print ('read word embedding......')
@@ -190,7 +187,7 @@ def main(_):
     test_word = np.load('./data/weibo_test_word.npy')
     test_label = np.load('./data/weibo_test_label.npy')
     test_length = np.load('./data/weibo_test_length.npy')
-    setting = Weibo_model.Setting()
+    setting = mtl_model.Setting()
     with tf.Graph().as_default():
         # use GPU
         os.environ["CUDA_VISIBLE_DEVICES"] = "2"
@@ -200,7 +197,7 @@ def main(_):
         sess=tf.Session(config=config)
         with sess.as_default():
             with tf.variable_scope('ner_model'):
-                m = Weibo_model.TransferModel(setting, tf.cast(embedding, tf.float32), adv=True, is_train=False)
+                m = mtl_model.TransferModel(setting, tf.cast(embedding, tf.float32), adv=True, is_train=False)
                 m.multi_task()
 
             saver=tf.train.Saver(allow_empty=True)
