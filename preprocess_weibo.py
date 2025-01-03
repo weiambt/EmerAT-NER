@@ -5,6 +5,7 @@ import re
 
 rNUM = '(-|\+)?\d+((\.)\d+)?%?'
 rENG = '[A-Za-z_.]+'
+# 词嵌入的numpy向量
 vector = []
 word2id = {}
 id2word = {}
@@ -13,6 +14,9 @@ id_tag={}
 word_dim=100
 num_steps=80
 
+# todo 这个文件用于将BIO数据集，经过静态embedding，预处理成npy格式，我不需要，因为我不用这个方式
+
+# 加载传统词嵌入：Word2Vec
 def load_embedding(setting):
     print('reading chinese word embedding.....')
     f = open('./data/embed.txt','r')
@@ -29,6 +33,7 @@ def load_embedding(setting):
             content=[float(i) for i in content]
             vector.append(content)
     f.close()
+    # 将padding（空填充）和unk（未知）加入词嵌入中，将vector设置成全0、随机向量
     word2id['padding']=len(word2id)
     word2id['unk']=len(word2id)
     vector.append(np.zeros(shape=setting.word_dim,dtype=np.float32))
@@ -36,7 +41,7 @@ def load_embedding(setting):
     id2word[len(id2word)]='padding'
     id2word[len(id2word)]='unk'
 
-# weiboNER.conll.train
+# 预处理weiboNER.conll.train
 def process_train_data(setting):
     print('reading train data.....')
     train_word=[]
@@ -59,16 +64,20 @@ def process_train_data(setting):
             train_label.append([])
         else:
             content=content.replace('\n','').replace('\r','').strip().split()
+            # 是实体
             if content[1]!='O':
                 label1=content[1].split('.')[0]
                 label2=content[1].split('.')[1]
                 content[1]=label1
+                # 对weibo数据集约束，只要NAM，不要NOM
                 if label2=='NOM':
                     content[1]='O'
+            # 如果不在词嵌入中，就加入，随机生成一个向量
             if content[0] not in word2id:
                 word2id[content[0]]=len(word2id)
                 vector.append(np.random.normal(loc=0.0,scale=0.1,size=setting.word_dim))
                 id2word[len(id2word)]=content[0]
+            # 如果不在实体tag中，加入
             if content[1] not in tag_id:
                 tag_id[content[1]]=len(tag_id)
                 id_tag[len(id_tag)]=content[1]
@@ -159,6 +168,7 @@ def process_test_data(setting):
     np.save('./data/weibo_test_label.npy',test_label)
     np.save('./data/weibo_test_length.npy', test_length)
 
+# 全角转半角
 def strQ2B(ustring):
     rstring = ""
     for uchar in ustring:
@@ -170,6 +180,7 @@ def strQ2B(ustring):
         rstring += chr(inside_code)
     return rstring
 
+# 处理CWS任务数据集
 def preprocess(filename):
     sentence=[]
     length=[]
@@ -229,7 +240,7 @@ def id_to_tag(x):
 def id_to_word(x):
     return id2word[x]
 
-setting= Weibo_model.Setting()
+setting= mtl_model.Setting()
 load_embedding(setting)
 process_train_data(setting)
 process_test_data(setting)
