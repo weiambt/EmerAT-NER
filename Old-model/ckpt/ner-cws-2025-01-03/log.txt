@@ -1,0 +1,18 @@
+------epoch 0
+step 20,loss 4.726902008056641
+step 40,loss 5.965536594390869
+step 60,loss 3.7636914253234863
+=====update best F1, epoch = 0,step = 67 ,best_f1_score = 0.09009009009009009,current f1_val > best_f1_score
+------epoch 1
+step 80,loss 4.53563928604126
+step 100,loss 8.117752075195312
+step 120,loss 1.8268966674804688
+------epoch 2
+step 140,loss 5.720095157623291
+step 160,loss 3.16312837600708
+step 180,loss 2.6471619606018066
+step 200,loss 5.097533226013184
+=====update best F1, epoch = 2,step = 201 ,best_f1_score = 0.27540983606557373,current f1_val > best_f1_score
+========= final best f1 = 0.27540983606557373,on epoch 2,on step 201
+execute time is 74 s
+,
