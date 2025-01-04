@@ -22,7 +22,7 @@ class Setting(object):
         self.out_keep_prob=0.6
         self.batch_size=20
         self.clip=5
-        self.num_epoches=1
+        self.num_epoches=3
         self.adv_weight=0.06
         self.task_num=2
         self.ner_tags_num=9
