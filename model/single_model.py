@@ -22,7 +22,7 @@ class Setting(object):
         self.out_keep_prob=0.6
         self.batch_size=20
         self.clip=5
-        self.num_epoches=1
+        self.num_epoches=3
         self.adv_weight=0.06
         self.task_num=2
         self.ner_tags_num=9
@@ -174,7 +174,6 @@ class Model(object):
             ner_crf_loss, self.ner_trans_params = tfa.text.crf_log_likelihood(self.ner_project_logits, self.label, self.sent_len)
             self.ner_loss = tf.reduce_mean(-ner_crf_loss)
 
-        # self.ner_loss=tf.reduce_mean(-log_likelihood)
 
         # output = tf.concat([ner_private_output,shared_output],axis=-1)
         # output = tf.reshape(output,[-1, 4 * self.lstm_dim])

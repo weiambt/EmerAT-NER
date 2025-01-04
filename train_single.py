@@ -1,14 +1,15 @@
 import time
-
 import numpy as np
-from model import single_model
 import os
+import tensorflow_addons as tfa
 
 import tensorflow as tfv2
 import tensorflow.compat.v1 as tf
 tf.disable_eager_execution()
 tf.disable_v2_behavior()
 
+from model import single_model
+from utils.common import CommonUtil
 
 
 def main(_):
@@ -28,9 +29,13 @@ def main(_):
     train_word=np.load('./data/weibo_train_word.npy')
     train_label=np.load('./data/weibo_train_label.npy')
     train_length=np.load('./data/weibo_train_length.npy')
+
+    print ('read test data......')
+    test_word = np.load('./data/weibo_test_word.npy')
+    test_label = np.load('./data/weibo_test_label.npy')
+    test_length = np.load('./data/weibo_test_length.npy')
+
     print ('read cws train data......')
-    train_cws_word=np.load('./data/weibo_cws_word.npy')
-    train_cws_label=np.load('./data/weibo_cws_label.npy')
     setting = single_model.Setting()
     task_ner=[]
     task_cws=[]
@@ -46,30 +51,27 @@ def main(_):
         with sess.as_default():
             initializer = tfv2.keras.initializers.GlorotUniform()
             with tf.variable_scope('ner_model',reuse=None,initializer=initializer):
-                m = single_model.Model(setting, tf.cast(embedding, tf.float32), adv=True, is_train=True)
-                m.single_task()
+                model = single_model.Model(setting, tf.cast(embedding, tf.float32), adv=True, is_train=True)
+                model.single_task()
             global_step = tf.Variable(0, name="global_step", trainable=False)
-            global_step1 = tf.Variable(0, name="global_step1", trainable=False)
             optimizer = tf.train.AdamOptimizer(0.001)
             if setting.clip>0:
-                grads, vs=zip(*optimizer.compute_gradients(m.loss))
+                grads, vs=zip(*optimizer.compute_gradients(model.loss))
                 grads,_ =tf.clip_by_global_norm(grads,clip_norm=setting.clip)
                 train_op=optimizer.apply_gradients(zip(grads,vs),global_step)
-                train_op1 = optimizer.apply_gradients(zip(grads, vs), global_step1)
             else:
-                train_op=optimizer.minimize(m.loss, global_step)
-                train_op1 = optimizer.minimize(m.loss, global_step1)
+                train_op=optimizer.minimize(model.loss, global_step)
             sess.run(tf.initialize_all_variables())
-            saver=tf.train.Saver(max_to_keep=None)
+            saver=tf.train.Saver(max_to_keep=3)
+            best_f1_val = 0.0
+            best_step = -1
             # each epoch
             for one_epoch in range(setting.num_epoches):
                 info = "------epoch {}\n".format(one_epoch)
                 print(info)
                 out.write(info)
                 temp_order=list(range(len(train_word)))
-                temp_order_cws=list(range(len(train_cws_word)))
                 np.random.shuffle(temp_order)
-                np.random.shuffle(temp_order_cws)
                 for i in range(len(temp_order)//setting.batch_size):
                     temp_word = []
                     temp_label = []
@@ -80,27 +82,54 @@ def main(_):
                         temp_label.append(train_label[temp_input_index[k]])
                         temp_length.append(train_length[temp_input_index[k]])
                     feed_dict={}
-                    feed_dict[m.input]=np.asarray(temp_word)
-                    feed_dict[m.label]=np.asarray(temp_label)
-                    feed_dict[m.sent_len]=np.asarray(temp_length)
-                    feed_dict[m.is_ner]=1
-                    feed_dict[m.task_label]=np.asarray(task_ner)
-                    _, step, loss= sess.run([train_op,global_step,m.ner_loss],feed_dict)
+                    feed_dict[model.input]=np.asarray(temp_word)
+                    feed_dict[model.label]=np.asarray(temp_label)
+                    feed_dict[model.sent_len]=np.asarray(temp_length)
+                    feed_dict[model.is_ner]=1
+                    feed_dict[model.task_label]=np.asarray(task_ner)
+                    _, step, loss= sess.run([train_op,global_step,model.ner_loss],feed_dict)
                     if step % 20 ==0:
                         temp = "step {},loss {}\n".format(step, loss)
                         print (temp)
                         out.write(temp)
                     current_step = step
-                    # if current_step % 120 == 0 and current_step > 2000 and current_step < 10000:
-                    if current_step % 60 == 0:
-                        saver.save(sess, save_path=save_path, global_step=current_step)
-
+                # 每个epoch后验证模型
+                f1_val = validate(sess,test_word,test_label,test_length, setting, model)
+                if f1_val > best_f1_val:
+                    best_f1_val = f1_val
+                    best_step = current_step
+                    info = "=====update best F1, epoch = {},step = {} ,best_f1_score = {},current f1_val > best_f1_score".format(one_epoch,step,best_f1_val)
+                    print(info)
+                    out.write(info+"\n")
+                    saver.save(sess, save_path=save_path, global_step=current_step)
+            info = '========= final best f1 = {},on epoch {},on step {}'.format(best_f1_val,one_epoch,best_step)
+            print(info)
+            out.write(info+"\n")
 
     extime = time.time() - startTime
     info = 'execute time is {} s\n,'.format(str(int(extime)))
+    print (info)
     out.write(info)
     out.close()
 
+def validate(sess,test_word,test_label,test_length,setting,model):
+    results = []
+    for j in range(len(test_word) // setting.batch_size):
+        word_batch = test_word[j * setting.batch_size:(j + 1) * setting.batch_size]
+        length_batch = test_length[j * setting.batch_size:(j + 1) * setting.batch_size]
+        label_batch = test_label[j * setting.batch_size:(j + 1) * setting.batch_size]
+        feed_dict = {}
+        feed_dict[model.input] = word_batch
+        feed_dict[model.sent_len] = length_batch
+        feed_dict[model.is_ner] = 1
+        logits, trans_params = sess.run([model.ner_project_logits, model.ner_trans_params], feed_dict)
+        # viterbi_sequences=decode(logits,trans_params,length_batch)
+        viterbi_sequences, viterbi_scores = tfa.text.crf_decode(logits, trans_params, length_batch)
+
+        result_batch = CommonUtil.evaluate(viterbi_sequences, label_batch, length_batch, word_batch)
+        results.append(result_batch)
+    f1 = CommonUtil.compute_f1(results)
+    return f1
 
 if __name__ == "__main__":
     tf.app.run()
