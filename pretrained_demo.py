@@ -110,7 +110,8 @@ class DataManager:
                     tmp_x = []
                     tmp_y = []
                     bar.update()
-                    break
+                    # todo 测试使用，加载少量数据
+                    # break
                 else:
                     tmp_x.append(token)
                     tmp_y.append(label)
@@ -155,8 +156,9 @@ class DataManager:
                 outfile.write(id2label[idx] + '\t' + str(idx) + '\n')
         return token2id, id2token, label2id, id2label
 
-
-def test_DataManager():
+# 测试主流程训练过程，bert+bilstm+crf
+# todo 根据loss学习
+def test_main_process():
     tokenizer = BertTokenizer.from_pretrained(huggingface_tag,from_pt=True)
     pretrained_model = TFBertModel.from_pretrained(huggingface_tag,from_pt=True)
     print(pretrained_model)
@@ -165,6 +167,10 @@ def test_DataManager():
 
     train_dataset, val_dataset = dm.get_train_dev_data()
     batch_size = 32
+
+    # num_classes是 len(label2id)
+    num_classes = len(dm.label2id)
+    my_transition_params = tfv2.Variable(tfv2.random.uniform(shape=(num_classes, num_classes)))
 
     for step,batch in train_dataset.shuffle(len(train_dataset)).batch(batch_size).enumerate():
         X_train_batch, y_train_batch, att_mask_batch = batch
@@ -182,17 +188,20 @@ def test_DataManager():
         mybilstm = tfv2.keras.layers.Bidirectional(tfv2.keras.layers.LSTM(lstm_hidden_dim, return_sequences=True))
         outputs = mybilstm(outputs)
 
-        # num_classes是 len(label2id)
-        num_classes = len(dm.label2id)
         mydense = tfv2.keras.layers.Dense(num_classes)
         logits = mydense(outputs)
 
         targets = y_train_batch
         tensor_targets = tfv2.convert_to_tensor(targets)
-        my_transition_params = tfv2.Variable(tfv2.random.uniform(shape=(num_classes, num_classes)))
+
         log_likelihood, transition_params = tfa.text.crf.crf_log_likelihood(
             logits, tensor_targets, inputs_length, transition_params=my_transition_params)
+        # log_likelihood是(batch_size,)，表示一个step（batch）下每个句子的crf得分
         print(log_likelihood)
+        # 对单个批次下的所有crf得分求均值作为单个batch的损失
+        loss = -tfv2.reduce_mean(log_likelihood)
+        info = 'step = {}, loss = {}'.format(step, loss)
+        print(info)
 
 
 
@@ -272,4 +281,4 @@ def demo():
 if __name__ == '__main__':
     # demo()
     # test_tokenizer()
-    test_DataManager()
+    test_main_process()
