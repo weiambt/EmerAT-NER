@@ -49,7 +49,7 @@ def process_train_data(setting):
     train_word=[]
     train_label=[]
     train_length=[]
-    f=open('./data/weiboNER.conll.train','r',encoding='utf8')
+    f=open('data/weiboNER_train.csv', 'r', encoding='utf8')
     train_word.append([])
     train_label.append([])
     train_max_len=0
@@ -116,7 +116,7 @@ def process_test_data(setting):
     test_word=[]
     test_label=[]
     test_length=[]
-    f=open('./data/weiboNER.conll.test','r')
+    f=open('data/weiboNER_test.csv', 'r')
     test_word.append([])
     test_label.append([])
     test_max_len=0
