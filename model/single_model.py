@@ -3,8 +3,9 @@ import base_model
 import tensorflow as tfv2
 import tensorflow.compat.v1 as tf
 
-tf.disable_eager_execution()
-tf.disable_v2_behavior()
+# 加这个和transfoemers不兼容
+# tf.disable_eager_execution()
+# tf.disable_v2_behavior()
 import tensorflow_addons as tfa
 
 class Setting(object):
@@ -15,7 +16,7 @@ class Setting(object):
         self.num_units=240
         self.num_heads=8
         # self.num_steps 通常表示输入序列的固定最大长度，不足的补padding，多的截断
-        self.num_steps=80
+        self.num_steps=300
         self.keep_prob=0.7
         self.keep_prob1=0.7
         self.in_keep_prob=0.7

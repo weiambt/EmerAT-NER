@@ -3,8 +3,9 @@ import base_model
 import tensorflow as tfv2
 import tensorflow.compat.v1 as tf
 
-tf.disable_eager_execution()
-tf.disable_v2_behavior()
+# 加这个和transfoemers不兼容
+# tf.disable_eager_execution()
+# tf.disable_v2_behavior()
 import tensorflow_addons as tfa
 
 class Setting(object):
