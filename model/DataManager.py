@@ -9,13 +9,21 @@ import model.mtl_model
 from model import single_model
 from model.Configure import Configure
 
+class DataSet:
+    def __init__(self,X,y,attention_mask):
+        self.X = X
+        self.y = y
+        self.attention_mask = attention_mask
+        # 数据集中句子个数
+        self.data_size = len(X)
+
 
 class DataManager:
     def __init__(self,cfg,setting):
         self.UNKNOWN = '[UNK]'
         self.PADDING = '[PAD]'
         self.max_sequence_length = setting.num_steps
-
+        self.suffix = cfg.suffix
         # 读取不了非CSV文件
         self.train_file = cfg.train_file
         self.dev_file = cfg.dev_file
@@ -25,8 +33,10 @@ class DataManager:
         self.tokenizer = BertTokenizer.from_pretrained(self.huggingface_tag)
         # 构建词表，如果是bert，只需要label2id和id2label
         self.token2id, self.id2token, self.label2id, self.id2label = self.build_vocab(self.train_file)
+        self.max_label_number = len(self.label2id)
 
-    # 读取训练集、验证集，经过预训练模型的tokenizer，并shuffle后的结果
+        # 读取训练集、验证集，经过预训练模型的tokenizer，并shuffle后的结果
+    # return train_dataset,dev_dataset
     def get_train_dev_data(self):
         # 1. 构建训练集
         df_train = pd.read_csv(self.train_file, sep=" ", quoting=csv.QUOTE_NONE,
@@ -51,6 +61,8 @@ class DataManager:
         train_dataset = tfv2.data.Dataset.from_tensor_slices((X_train, y_train, att_mask_train))
         val_dataset = tfv2.data.Dataset.from_tensor_slices((X_val, y_val, att_mask_val))
 
+        # todo 因为不支持tf.dataset所以用Numpy返回
+        # return DataSet(X_train,y_train,att_mask_train),DataSet(X_val,y_val,att_mask_val)
         return train_dataset, val_dataset
 
     # 读取验证集
@@ -73,6 +85,7 @@ class DataManager:
         tmp_x = []
         tmp_y = []
         lines = df.token.isnull().sum()
+        cnt = 0
         with tqdm(total=lines, desc='loading data') as bar:
             for _, record in df.iterrows():
                 token = record.token
@@ -109,6 +122,10 @@ class DataManager:
                     tmp_x = []
                     tmp_y = []
                     bar.update()
+                    # todo 测试
+                    if cnt>500:
+                        break
+                    cnt += 1
                 else:
                     tmp_x.append(token)
                     tmp_y.append(label)

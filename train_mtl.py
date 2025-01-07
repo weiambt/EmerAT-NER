@@ -5,6 +5,7 @@ import tensorflow_addons as tfa
 
 import tensorflow as tfv2
 import tensorflow.compat.v1 as tf
+# todo 下面待注释？？
 tf.disable_eager_execution()
 tf.disable_v2_behavior()
 

@@ -12,7 +12,7 @@ id2word = {}
 tag_id = {}
 id_tag={}
 word_dim=100
-num_steps=80
+num_steps=300
 
 # todo 这个文件用于将BIO数据集，经过静态embedding，预处理成npy格式，我不需要，因为我不用这个方式
 
