@@ -3,11 +3,14 @@ import sys
 
 # 基础配置
 class Configure:
-    def __init__(self,train_file,dev_file,label2id_file,huggingface_tag):
+    def __init__(self,train_file,dev_file,label2id_file,huggingface_tag,suffix):
         self.train_file = train_file
         self.dev_file = dev_file
         self.label2id_file = label2id_file
         self.huggingface_tag = huggingface_tag
+        self.suffix = suffix
+
+
 
 
         # config = self.config_file_to_dict(config_file)
