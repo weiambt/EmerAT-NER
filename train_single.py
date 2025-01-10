@@ -18,7 +18,6 @@ from model.DataManager import DataManager
 # tf.disable_v2_behavior()
 
 from model import single_model
-from utils.common import CommonUtil
 import utils.metric as MetricUtil
 import utils.logger
 
@@ -66,25 +65,24 @@ class Setting(object):
 
 
 class TrainSingle:
-    def __init__(self):
-
-        # 词表embedding
-        self.embedding = None
-
+    def __init__(self,setting,logger):
+        self.setting = setting
+        self.logger = logger
 
         self.initializer = tfv2.keras.initializers.GlorotUniform()
-        self.setting = Setting()
-
         self.datamanager_src = DataManager(self.setting,self.setting.dataset_src)
         # self.datamanager_tgt = DataManager(self.setting,self.setting.dataset_tgt)
 
-        self.ner_model = single_model.Model(self.setting,self.datamanager_src)
+        self.ner_model = single_model.Model(self.logger,self.setting,self.datamanager_src)
         self.pretrained_model = TFBertModel.from_pretrained(self.setting.huggingface_tag, from_pt=True)
         self.optimizer = Adam(learning_rate=self.setting.lr)
         self.global_step = tfv2.Variable(0, name="global_step", trainable=False)
         checkpoint = tf.train.Checkpoint(ner_model=self.ner_model)
         self.checkpoint_manager = tf.train.CheckpointManager(
             checkpoint, directory=self.setting.checkpoints_dir, checkpoint_name=self.setting.checkpoint_name, max_to_keep=self.setting.max_to_keep)
+
+        # 词表embedding
+        self.embedding = None
 
 
     def train(self):
@@ -93,8 +91,7 @@ class TrainSingle:
         if not os.path.exists(self.setting.checkpoints_dir):
             os.makedirs(self.setting.checkpoints_dir)
         # model_name = 'model-{}'.format(dir_path)
-        out = open('{}/log.txt'.format(self.setting.checkpoints_dir), 'w')
-        start_time = time.time()
+        final_start_time = time.time()
 
         # self.embedding = tfv2.cast(np.load('./data/weibo_vector.npy'), tf.float32)
 
@@ -123,9 +120,8 @@ class TrainSingle:
 
         # each epoch
         for one_epoch in range(self.setting.num_epoches):
-            info = "------epoch {}\n".format(one_epoch)
-            print(info)
-            out.write(info)
+            start_time = time.time()
+            self.logger.info("------epoch {}\n".format(one_epoch))
 
             for step, batch in train_dataset.shuffle(len(train_dataset)).batch(self.setting.batch_size).enumerate():
                 X_train_batch, y_train_batch, att_mask_batch = batch
@@ -143,9 +139,7 @@ class TrainSingle:
                     logits, transition_params,loss = self.ner_model.single_task(embedding_inputs, inputs_length_bacth, y_train_batch,is_train=True)
                     current_step = int(self.global_step.numpy())
                     if current_step % 20 == 0:
-                        temp = "step {},loss {}\n".format(current_step, loss)
-                        print(temp)
-                        out.write(temp)
+                        self.logger.info("step {},loss {}\n".format(current_step, loss))
 
                 # 定义好参加梯度的参数
                 variables = self.ner_model.trainable_variables
@@ -165,39 +159,19 @@ class TrainSingle:
             # continue
             # # 每个epoch后验证模型
             val_f1_avg, val_res_str = self.validate(dev_dataset)
-            time_span = (time.time() - start_time) / 60
-            info = 'time consumption:%.2f(min), %s\n' % (time_span, val_res_str)
-            print(info)
-            out.write(info)
+            time_execution = (time.time() - start_time) / 60
+            self.logger.info('time consumption:%.2f(min), %s\n' % (time_execution, val_res_str))
 
             if np.array(val_f1_avg).mean() > best_f1_val:
                 best_f1_val = np.array(val_f1_avg).mean()
                 best_at_epoch = one_epoch + 1
                 self.checkpoint_manager.save()
-                info = ('===== saved the new best model with f1: %.3f \n' % best_f1_val)
-                print(info)
-                out.write(info)
+                self.logger.info(('===== saved the new best model with f1: %.3f \n' % best_f1_val))
 
+        self.logger.info('========= final best f1 = {},on epoch {},on step {}'.format(best_f1_val, best_at_epoch, best_step))
 
-            # f1_val = validate(sess, test_word, test_label, test_length, setting, model)
-            # if f1_val > best_f1_val:
-            #     best_f1_val = f1_val
-            #     best_step = current_step
-            #     info = "=====update best F1, epoch = {},step = {} ,best_f1_score = {},current f1_val > best_f1_score".format(
-            #         one_epoch, step, best_f1_val)
-            #     print(info)
-            #     out.write(info + "\n")
-            #     saver.save(sess, save_path=save_path, global_step=current_step)
-
-        info = '========= final best f1 = {},on epoch {},on step {}'.format(best_f1_val, best_at_epoch, best_step)
-        print(info)
-        out.write(info + "\n")
-
-        extime = time.time() - start_time
-        info = 'execute time is {} s\n,'.format(str(int(extime)))
-        print(info)
-        out.write(info)
-        out.close()
+        final_execute_time = time.time() - final_start_time
+        self.logger.info('total execute time is {} s\n,'.format(str(int(final_execute_time))))
 
     # 验证时需要加载对应的embedding
     def validate(self, val_dataset):
@@ -276,7 +250,8 @@ class TrainSingle:
 
 if __name__ == "__main__":
     logger = utils.logger.get_logger('./log')
-    TrainSingle().train()
+    setting = Setting()
+    TrainSingle(setting,logger).train()
 
 def test_log():
     logger = utils.logger.get_logger('./utils')

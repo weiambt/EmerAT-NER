@@ -11,8 +11,9 @@ import tensorflow_addons as tfa
 
 
 class Model(tfv2.keras.Model):
-    def __init__(self, setting,datamanager_src,datamanager_tgt=None):
+    def __init__(self,logger,setting,datamanager_src,datamanager_tgt=None):
         super(Model, self).__init__()
+        self.logger = logger
         self.lr = setting.lr
         self.word_dim = setting.word_dim
         self.lstm_dim = setting.lstm_dim
@@ -86,7 +87,7 @@ class Model(tfv2.keras.Model):
         b_adv = tf.get_variable(name='b_adv', shape=[self.task_num], dtype=tf.float32,
                                        initializer=tfv2.keras.initializers.GlorotUniform())
         logits = tf.nn.xw_plus_b(feature,W_adv,b_adv)
-        adv_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=self.task_label))
+        adv_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=self.task_labeltask_label))
         return adv_loss
 
     # def normalize(self,inputs, epsilon = 1e-8,scope="ln",reuse=None):
