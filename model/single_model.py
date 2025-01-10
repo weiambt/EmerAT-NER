@@ -8,32 +8,10 @@ import tensorflow.compat.v1 as tf
 # tf.disable_v2_behavior()
 import tensorflow_addons as tfa
 
-class Setting(object):
-    def __init__(self):
-        self.lr=0.001
-        self.word_dim=100
-        self.lstm_dim=120
-        self.num_units=240
-        self.num_heads=8
-        # self.num_steps 通常表示输入序列的固定最大长度，不足的补padding，多的截断
-        self.num_steps=300
-        self.keep_prob=0.7
-        self.keep_prob1=0.7
-        self.in_keep_prob=0.7
-        self.out_keep_prob=0.6
-        self.batch_size=20
-        self.clip=5
-        self.num_epoches=30
-        self.adv_weight=0.06
-        self.task_num=2
-        # todo 这个应该是计算出来的
-        # self.ner_tags_num=9
-        # self.cws_tags_num=4
-        self.ner_tags_num=0
-        self.cws_tags_num=0
+
 
 class Model(tfv2.keras.Model):
-    def __init__(self, setting,ner_max_label_number):
+    def __init__(self, setting,datamanager_src,datamanager_tgt=None):
         super(Model, self).__init__()
         self.lr = setting.lr
         self.word_dim = setting.word_dim
@@ -41,8 +19,8 @@ class Model(tfv2.keras.Model):
         self.num_units = setting.num_units
         self.num_steps = setting.num_steps
         self.num_heads = setting.num_heads
-        self.keep_prob = setting.keep_prob
-        self.keep_prob1 = setting.keep_prob1
+        self.keep_prob_tgt = setting.keep_prob_tgt
+        self.keep_prob_src = setting.keep_prob_src
         self.in_keep_prob = setting.in_keep_prob
         self.out_keep_prob = setting.out_keep_prob
         self.batch_size = setting.batch_size
@@ -52,11 +30,16 @@ class Model(tfv2.keras.Model):
         self.task_num = setting.task_num
         # self.adv = adv
 
-        self.ner_tags_num = ner_max_label_number
-        # self.cws_tags_num = cws_tags_num
+        self.tags_num_src = datamanager_src.max_label_number
+        # self.tags_num_tgt = datamanager_tgt.max_label_number
+
+        # todo 这个要传进来，在多模型中
+        # self.task_label =
 
 
-        self.transition_params = tfv2.Variable(tfv2.random.uniform(shape=(self.ner_tags_num,self.ner_tags_num)))
+
+
+        self.transition_params = tfv2.Variable(tfv2.random.uniform(shape=(self.tags_num_src,self.tags_num_src)))
 
         self.shared_bilstm = tfv2.keras.layers.Bidirectional(
             tfv2.keras.layers.LSTM(self.lstm_dim, return_sequences=True, dropout=1 - self.in_keep_prob)
@@ -76,9 +59,9 @@ class Model(tfv2.keras.Model):
 
         self.W_ner = tfv2.keras.layers.Dense(self.lstm_dim, activation="tanh", name="W_ner")
 
-        self.dropout = tfv2.keras.layers.Dropout(rate=1 - self.keep_prob1)
+        self.dropout = tfv2.keras.layers.Dropout(rate=1 - self.keep_prob_src)
 
-        self.logits_W_ner = tfv2.keras.layers.Dense(self.ner_tags_num, name="logits_W_ner")
+        self.logits_W_ner = tfv2.keras.layers.Dense(self.tags_num_src, name="logits_W_ner")
 
         # self.input = tf.placeholder(tf.int32, [None, self.num_steps])
         # # NER任务的label数组
@@ -96,7 +79,7 @@ class Model(tfv2.keras.Model):
         flip_gradient = base_model.FlipGradientBuilder()
         feature=flip_gradient(feature)
         if self.is_train:
-            feature=tf.nn.dropout(feature,self.keep_prob1)
+            feature=tf.nn.dropout(feature,self.keep_prob_src)
         W_adv = tf.get_variable(name='W_adv', shape=[2 * self.lstm_dim, self.task_num],
                                        dtype=tf.float32,
                                        initializer=tfv2.keras.initializers.GlorotUniform())
@@ -151,7 +134,7 @@ class Model(tfv2.keras.Model):
             query_masks = tf.tile(tf.expand_dims(query_masks, -1), [1, 1, tf.shape(keys)[1]])
             outputs *= query_masks
             if self.is_train:
-                outputs = tf.nn.dropout(outputs, keep_prob=self.keep_prob1)
+                outputs = tf.nn.dropout(outputs, keep_prob=self.keep_prob_src)
             outputs = tf.matmul(outputs, V_)
             outputs = tf.concat(tf.split(outputs, self.num_heads, axis=0), axis=2)
             outputs += keys
@@ -161,7 +144,7 @@ class Model(tfv2.keras.Model):
     def self_attention2(self, keys, scope='multihead_attention'):
         # Q, K, V 和注意力层的计算
         multi_head_attention = tf.keras.layers.MultiHeadAttention(
-            num_heads=self.num_heads, key_dim=self.num_units, dropout=1 - self.keep_prob1)
+            num_heads=self.num_heads, key_dim=self.num_units, dropout=1 - self.keep_prob_src)
 
         # 计算多头自注意力输出
         outputs = multi_head_attention(query=keys, value=keys, key=keys)
@@ -227,7 +210,7 @@ class Model(tfv2.keras.Model):
 
         # Dropout
         if self.is_train:
-            outputs = tfv2.nn.dropout(outputs, self.keep_prob1)
+            outputs = tfv2.nn.dropout(outputs, self.keep_prob_src)
 
         # 计算输出
         outputs = tfv2.matmul(outputs, V_)
@@ -242,12 +225,13 @@ class Model(tfv2.keras.Model):
         outputs = self.normalize(outputs)
 
         return outputs
+
     @tfv2.function
     def single_task(self,input,sent_len,label,is_train):
         self.is_train = is_train
 
         if self.is_train:
-            input = tfv2.nn.dropout(input,self.keep_prob)
+            input = tfv2.nn.dropout(input,self.keep_prob_src)
 
         with tf.variable_scope('common_bilstm'):
             shared_bilstm = self.shared_bilstm(input)
@@ -266,7 +250,7 @@ class Model(tfv2.keras.Model):
             hidden_output_ner = self.dropout(hidden_output_ner)
 
         ner_logits = self.logits_W_ner(hidden_output_ner)
-        self.ner_project_logits = tf.reshape(ner_logits, [-1, self.num_steps, self.ner_tags_num])
+        self.ner_project_logits = tf.reshape(ner_logits, [-1, self.num_steps, self.tags_num_src])
         with tf.variable_scope('ner_crf'):
             ner_crf_loss, self.transition_params = tfa.text.crf_log_likelihood(self.ner_project_logits, label, sent_len,transition_params=self.transition_params)
             self.ner_loss = tf.reduce_mean(-ner_crf_loss)

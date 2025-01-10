@@ -10,6 +10,7 @@ from keras.optimizers import Adam
 from tqdm import tqdm
 from transformers import TFBertModel
 
+from DataSet import DataSet
 from model.Configure import Configure
 from model.DataManager import DataManager
 
@@ -19,49 +20,85 @@ from model.DataManager import DataManager
 from model import single_model
 from utils.common import CommonUtil
 import utils.metric as MetricUtil
+import utils.logger
+
+class Setting(object):
+    def __init__(self):
+        # global parameter
+        self.adv_weight = 0.06
+        self.task_num = 2
+
+        # dataset config
+        self.dataset_src = DataSet("people")
+        # self.dataset_tgt = DataSet("my")
+
+        self.checkpoints_dir = './ckpt/ner-cws-2025-01-03'
+        self.checkpoint_name = 'model'
+        self.huggingface_tag = '/Users/didi/Desktop/KYCode/huggingface/Bert/bert-base-chinese'
+
+
+        # common train parameter
+        self.num_epoches = 30
+        self.batch_size = 20
+        # self.num_steps 通常表示输入序列的固定最大长度，不足的补padding，多的截断
+        self.num_steps = 300
+        self.lr = 0.001
+        self.word_dim = 100
+        self.lstm_dim = 120
+        self.num_units = 240
+        self.num_heads = 8
+        self.max_to_keep = 3
+        self.clip=5
+        self.in_keep_prob = 0.7
+        self.out_keep_prob = 0.6
+
+        # dataset  train
+        self.keep_prob_src = 0.7
+        self.keep_prob_tgt = 0.7
+
+
+        # todo 这个应该是计算出来的
+        # self.ner_tags_num=9
+        # self.cws_tags_num=4
+        # self.ner_tags_num=0
+        # self.cws_tags_num=0
+
 
 
 class TrainSingle:
     def __init__(self):
-        train_file = 'data/people/train.csv'
-        dev_file = 'data/people/dev.csv'
-        label2id_file = 'data/people/label2id.txt'
-        suffix = ["ORG", "PER", "LOC"]
 
-        huggingface_tag = '/Users/didi/Desktop/KYCode/huggingface/Bert/bert-base-chinese'
-        self.checkpoints_dir = './ckpt/ner-cws-2025-01-03'
-        self.checkpoint_name = 'model'
-        max_to_keep = 3
         # 词表embedding
         self.embedding = None
 
 
         self.initializer = tfv2.keras.initializers.GlorotUniform()
-        self.setting = single_model.Setting()
-        self.cfg = Configure(train_file=train_file, dev_file=dev_file, label2id_file=label2id_file,
-                        huggingface_tag=huggingface_tag, suffix=suffix)
-        self.datamanager = DataManager(self.cfg, self.setting)
+        self.setting = Setting()
 
-        self.ner_model = single_model.Model(self.setting,self.datamanager.max_label_number)
-        self.pretrained_model = TFBertModel.from_pretrained(huggingface_tag, from_pt=True)
-        self.optimizer = Adam(learning_rate=0.001)
+        self.datamanager_src = DataManager(self.setting,self.setting.dataset_src)
+        # self.datamanager_tgt = DataManager(self.setting,self.setting.dataset_tgt)
+
+        self.ner_model = single_model.Model(self.setting,self.datamanager_src)
+        self.pretrained_model = TFBertModel.from_pretrained(self.setting.huggingface_tag, from_pt=True)
+        self.optimizer = Adam(learning_rate=self.setting.lr)
         self.global_step = tfv2.Variable(0, name="global_step", trainable=False)
         checkpoint = tf.train.Checkpoint(ner_model=self.ner_model)
         self.checkpoint_manager = tf.train.CheckpointManager(
-            checkpoint, directory=self.checkpoints_dir, checkpoint_name=self.checkpoint_name, max_to_keep=max_to_keep)
+            checkpoint, directory=self.setting.checkpoints_dir, checkpoint_name=self.setting.checkpoint_name, max_to_keep=self.setting.max_to_keep)
 
 
     def train(self):
+
         # 如果不存在,创建文件
-        if not os.path.exists(self.checkpoints_dir):
-            os.makedirs(self.checkpoints_dir)
+        if not os.path.exists(self.setting.checkpoints_dir):
+            os.makedirs(self.setting.checkpoints_dir)
         # model_name = 'model-{}'.format(dir_path)
-        out = open('{}/log.txt'.format(self.checkpoints_dir), 'w')
+        out = open('{}/log.txt'.format(self.setting.checkpoints_dir), 'w')
         start_time = time.time()
 
-        self.embedding = tfv2.cast(np.load('./data/weibo_vector.npy'), tf.float32)
+        # self.embedding = tfv2.cast(np.load('./data/weibo_vector.npy'), tf.float32)
 
-        os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+        os.environ["CUDA_VISIBLE_DEVICES"] = "0"
         gpus = tfv2.config.experimental.list_physical_devices('GPU')
         if gpus:
             try:
@@ -70,7 +107,7 @@ class TrainSingle:
             except RuntimeError as e:
                 print(e)
 
-        train_dataset, dev_dataset = self.datamanager.get_train_dev_data()
+        train_dataset, dev_dataset = self.datamanager_src.get_train_dev_data()
 
         task_ner = []
         task_cws = []
@@ -170,7 +207,7 @@ class TrainSingle:
         loss_values = []
         val_results = {}
         val_labels_results = {}
-        for label in self.cfg.suffix:
+        for label in self.datamanager_src.suffix:
             val_labels_results.setdefault(label, {})
         measuring_metrics = ["precision", "recall", "f1", "accuracy"]
         for measure in measuring_metrics:
@@ -193,7 +230,7 @@ class TrainSingle:
             )
             batch_pred_sequence_val, _ = tfa.text.crf_decode(logits_val, transition_params_val, inputs_length_val)
             measures, lab_measures = MetricUtil.metrics(
-                X_val_batch, y_val_batch, batch_pred_sequence_val, self.datamanager)
+                X_val_batch, y_val_batch, batch_pred_sequence_val, self.datamanager_src)
 
             for k, v in measures.items():
                 val_results[k] += v
@@ -238,4 +275,9 @@ class TrainSingle:
 #     return f1
 
 if __name__ == "__main__":
+    logger = utils.logger.get_logger('./log')
     TrainSingle().train()
+
+def test_log():
+    logger = utils.logger.get_logger('./utils')
+    logger.info('adwa')

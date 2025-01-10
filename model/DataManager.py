@@ -19,16 +19,17 @@ class DataSet:
 
 
 class DataManager:
-    def __init__(self,cfg,setting):
+    def __init__(self,setting,dataset):
         self.UNKNOWN = '[UNK]'
         self.PADDING = '[PAD]'
         self.max_sequence_length = setting.num_steps
-        self.suffix = cfg.suffix
+        self.huggingface_tag = setting.huggingface_tag
+
         # 读取不了非CSV文件
-        self.train_file = cfg.train_file
-        self.dev_file = cfg.dev_file
-        self.label2id_file = cfg.label2id_file
-        self.huggingface_tag = cfg.huggingface_tag
+        self.train_file = dataset.train_file
+        self.dev_file = dataset.dev_file
+        self.label2id_file = dataset.label2id_file
+        self.suffix = dataset.suffix
 
         self.tokenizer = BertTokenizer.from_pretrained(self.huggingface_tag)
         # 构建词表，如果是bert，只需要label2id和id2label
@@ -37,6 +38,7 @@ class DataManager:
 
         # 读取训练集、验证集，经过预训练模型的tokenizer，并shuffle后的结果
     # return train_dataset,dev_dataset
+
     def get_train_dev_data(self):
         # 1. 构建训练集
         df_train = pd.read_csv(self.train_file, sep=" ", quoting=csv.QUOTE_NONE,
