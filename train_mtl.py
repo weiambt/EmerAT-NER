@@ -217,7 +217,7 @@ class TrainMtl:
         loss_values = []
         val_results = {}
         val_labels_results = {}
-        for label in self.datamanager_src.suffix:
+        for label in self.datamanager_tgt.suffix:
             val_labels_results.setdefault(label, {})
         measuring_metrics = ["precision", "recall", "f1", "accuracy"]
         for measure in measuring_metrics:
