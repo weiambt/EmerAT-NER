@@ -9,13 +9,13 @@ import model.mtl_model
 from model import single_model
 from model.Configure import Configure
 
-class DataSet:
-    def __init__(self,X,y,attention_mask):
-        self.X = X
-        self.y = y
-        self.attention_mask = attention_mask
-        # 数据集中句子个数
-        self.data_size = len(X)
+# class DataSet:
+#     def __init__(self,X,y,attention_mask):
+#         self.X = X
+#         self.y = y
+#         self.attention_mask = attention_mask
+#         # 数据集中句子个数
+#         self.data_size = len(X)
 
 
 class DataManager:
@@ -39,12 +39,12 @@ class DataManager:
         # 读取训练集、验证集，经过预训练模型的tokenizer，并shuffle后的结果
     # return train_dataset,dev_dataset
 
-    def get_train_dev_data(self):
+    def get_train_dev_data(self,less_data_flag=False):
         # 1. 构建训练集
         df_train = pd.read_csv(self.train_file, sep=" ", quoting=csv.QUOTE_NONE,
                                skip_blank_lines=False, header=None, names=['token', 'label'])
         # 这里调用tokenizer转换成向量 (if use_pretrained_model)
-        X, y, att_mask = self.prepare_pretrained_embedding(df_train)
+        X, y, att_mask = self.prepare_pretrained_embedding(df_train,less_data_flag)
         # shuffle the samples
         num_samples = len(X)
         indices = np.arange(num_samples)
@@ -57,7 +57,7 @@ class DataManager:
         X_train = X
         y_train = y
         att_mask_train = att_mask
-        X_val, y_val, att_mask_val = self.get_dev_data()
+        X_val, y_val, att_mask_val = self.get_dev_data(less_data_flag)
         print('training set size: {}, validating set size: {}'.format(len(X_train), len(X_val)))
         # write('training set size: {}, validating set size: {}'.format(len(X_train), len(X_val)))
         train_dataset = tfv2.data.Dataset.from_tensor_slices((X_train, y_train, att_mask_train))
@@ -68,19 +68,16 @@ class DataManager:
         return train_dataset, val_dataset
 
     # 读取验证集
-    def get_dev_data(self):
+    def get_dev_data(self,less_data):
         df_val = pd.read_csv(self.dev_file, sep=" ", quoting=csv.QUOTE_NONE,
                                skip_blank_lines=False, header=None, names=['token', 'label'])
         # if self.configs.use_pretrained_model:
-        X_val, y_val, att_mask_val = self.prepare_pretrained_embedding(df_val)
+        X_val, y_val, att_mask_val = self.prepare_pretrained_embedding(df_val,less_data)
         return X_val, y_val, att_mask_val
 
     # 根据BIO信息调用embedding tokenizer转换,label的转换
-    def prepare_pretrained_embedding(self,df):
-        """
-        :param df:
-        :return:
-        """
+    def prepare_pretrained_embedding(self,df,less_data):
+
         X = []
         y = []
         att_mask = []
@@ -124,8 +121,7 @@ class DataManager:
                     tmp_x = []
                     tmp_y = []
                     bar.update()
-                    # todo 测试
-                    if cnt>500:
+                    if less_data and cnt>500:
                         break
                     cnt += 1
                 else:

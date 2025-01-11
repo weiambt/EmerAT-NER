@@ -19,7 +19,7 @@ from model.DataManager import DataManager
 
 from model import single_model
 import utils.metric as MetricUtil
-import utils.logger
+import utils.logger as logger
 
 class Setting(object):
     def __init__(self):
@@ -30,6 +30,7 @@ class Setting(object):
         # dataset config
         self.dataset_src = DataSet("people")
         # self.dataset_tgt = DataSet("my")
+        self.less_data_flag = True
 
         self.checkpoints_dir = './ckpt/ner-cws-2025-01-03'
         self.checkpoint_name = 'model'
@@ -104,7 +105,7 @@ class TrainSingle:
             except RuntimeError as e:
                 print(e)
 
-        train_dataset, dev_dataset = self.datamanager_src.get_train_dev_data()
+        train_dataset, dev_dataset = self.datamanager_src.get_train_dev_data(self.setting.less_data_flag)
 
         task_ner = []
         task_cws = []
@@ -249,10 +250,7 @@ class TrainSingle:
 #     return f1
 
 if __name__ == "__main__":
-    logger = utils.logger.get_logger('./log')
+    logger = logger.get_logger('./log')
     setting = Setting()
     TrainSingle(setting,logger).train()
 
-def test_log():
-    logger = utils.logger.get_logger('./utils')
-    logger.info('adwa')
