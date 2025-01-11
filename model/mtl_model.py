@@ -126,9 +126,8 @@ class TransferModel(tfv2.keras.Model):
                 self.ner_loss_src = tf.reduce_mean(-ner_crf_loss)
         else:
             with tfv2.name_scope('target_bilstm'):
-                # tgt_private_output = self.private_bilstm_tgt(shared_bilstm_output)
-                # tgt_private_output = self.self_attention3(tgt_private_output)
-                tgt_private_output = shared_bilstm_output
+                tgt_private_output = self.private_bilstm_tgt(shared_bilstm_output)
+                tgt_private_output = self.self_attention3(tgt_private_output)
 
             # common + private lstm + CRF
             output = tfv2.concat([tgt_private_output, shared_bilstm_output], axis=-1)
