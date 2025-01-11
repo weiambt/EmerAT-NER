@@ -25,3 +25,13 @@ We have provided our best model on the original WeiboNER dataset in the `ckpt` d
 If you use the code, please cite this paper:
 
 Pengfei Cao, Yubo Chen, Kang Liu, Jun Zhao. Adversarial Transfer Learning for Chinese Named Entity Recognition with Self-Attention Mechanism. In Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing (EMNLP2018).
+
+## Version
+- tensorflow 2.12.0
+- tensorflow-addons
+- transformers
+- pytorch
+- numpy
+- pandas
+- tqmd
+- 

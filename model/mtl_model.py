@@ -41,8 +41,8 @@ class TransferModel(tfv2.keras.Model):
             tfv2.keras.layers.LSTM(self.lstm_dim, return_sequences=True, dropout=1 - self.in_keep_prob)
         )
 
-        self.transition_params_src = tfv2.Variable(tfv2.random.uniform(shape=(self.tags_num_src,self.tags_num_src)))
-        self.transition_params_tgt = tfv2.Variable(tfv2.random.uniform(shape=(self.tags_num_tgt,self.tags_num_tgt)))
+        self.transition_params_src = tfv2.Variable(tfv2.random.uniform(shape=(self.tags_num_src,self.tags_num_src),name="transition_params_src"))
+        self.transition_params_tgt = tfv2.Variable(tfv2.random.uniform(shape=(self.tags_num_tgt,self.tags_num_tgt),name="transition_params_tgt"))
 
         # 自注意力 Dense 层
         self.dense_q = tfv2.keras.layers.Dense(self.num_units, kernel_initializer=tfv2.keras.initializers.GlorotUniform())
@@ -305,8 +305,8 @@ class TransferModel(tfv2.keras.Model):
         inputs_shape = tfv2.shape(inputs)  # 动态获取输入形状
         params_shape = inputs_shape[-1:]  # 取最后一个维度的形状
         if self.beta is None or self.gamma is None:
-            self.beta = tfv2.Variable(tfv2.zeros(params_shape), dtype=tfv2.float32, trainable=True)
-            self.gamma = tfv2.Variable(tfv2.ones(params_shape), dtype=tfv2.float32, trainable=True)
+            self.beta = tfv2.Variable(tfv2.zeros(params_shape), dtype=tfv2.float32, trainable=True,name="beta")
+            self.gamma = tfv2.Variable(tfv2.ones(params_shape), dtype=tfv2.float32, trainable=True,name="gamma")
 
         mean, variance = tfv2.nn.moments(inputs, axes=[-1], keepdims=True)
         normalized = (inputs - mean) / tfv2.sqrt(variance + self.epsilon)
