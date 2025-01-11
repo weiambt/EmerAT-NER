@@ -10,6 +10,7 @@ from keras.optimizers import Adam
 from tqdm import tqdm
 from transformers import TFBertModel
 
+import conf.cfg
 from DataSet import DataSet
 from model.Configure import Configure
 from model.DataManager import DataManager
@@ -20,8 +21,11 @@ from model.DataManager import DataManager
 from model import single_model
 import utils.metric as MetricUtil
 import utils.logger as logger
+from tensorflow.keras import backend as K
+K.clear_session()
 
 class Setting(object):
+
     def __init__(self):
         # global parameter
         self.adv_weight = 0.06
@@ -34,12 +38,16 @@ class Setting(object):
 
         self.checkpoints_dir = './ckpt/ner-cws-2025-01-03'
         self.checkpoint_name = 'model'
-        self.huggingface_tag = '/Users/didi/Desktop/KYCode/huggingface/Bert/bert-base-chinese'
+
+        self.pretrained_model_name = 'bert-base-chinese'
+
+        # self.huggingface_tag = '/Users/didi/Desktop/KYCode/huggingface/Bert/bert-base-chinese'
+        # self.huggingface_tag = 'E:\\ARearchCode\\huggingface\\bert\\bert-base-chinese'
 
 
         # common train parameter
         self.num_epoches = 30
-        self.batch_size = 20
+        self.batch_size = 10
         # self.num_steps 通常表示输入序列的固定最大长度，不足的补padding，多的截断
         self.num_steps = 300
         self.lr = 0.001
@@ -66,16 +74,20 @@ class Setting(object):
 
 
 class TrainSingle:
-    def __init__(self,setting,logger):
+    def __init__(self,setting,conf,logger):
         self.setting = setting
         self.logger = logger
+        self.conf = conf
+        self.huggingface_tag = os.path.join(self.conf.huggingface_dir, self.setting.pretrained_model_name)
+        self.setting.huggingface_tag = self.huggingface_tag
 
         self.initializer = tfv2.keras.initializers.GlorotUniform()
         self.datamanager_src = DataManager(self.setting,self.setting.dataset_src)
         # self.datamanager_tgt = DataManager(self.setting,self.setting.dataset_tgt)
 
         self.ner_model = single_model.Model(self.logger,self.setting,self.datamanager_src)
-        self.pretrained_model = TFBertModel.from_pretrained(self.setting.huggingface_tag, from_pt=True)
+
+        self.pretrained_model = TFBertModel.from_pretrained(self.huggingface_tag, from_pt=True)
         self.optimizer = Adam(learning_rate=self.setting.lr)
         self.global_step = tfv2.Variable(0, name="global_step", trainable=False)
         checkpoint = tf.train.Checkpoint(ner_model=self.ner_model)
@@ -96,7 +108,6 @@ class TrainSingle:
 
         # self.embedding = tfv2.cast(np.load('./data/weibo_vector.npy'), tf.float32)
 
-        os.environ["CUDA_VISIBLE_DEVICES"] = "0"
         gpus = tfv2.config.experimental.list_physical_devices('GPU')
         if gpus:
             try:
@@ -250,7 +261,9 @@ class TrainSingle:
 #     return f1
 
 if __name__ == "__main__":
+    conf = conf.cfg.get_cfg_by_os()
+
     logger = logger.get_logger('./log')
     setting = Setting()
-    TrainSingle(setting,logger).train()
+    TrainSingle(setting,conf,logger).train()
 

@@ -8,8 +8,6 @@ import tensorflow.compat.v1 as tf
 # tf.disable_v2_behavior()
 import tensorflow_addons as tfa
 
-
-
 class Model(tfv2.keras.Model):
     def __init__(self,logger,setting,datamanager_src,datamanager_tgt=None):
         super(Model, self).__init__()
