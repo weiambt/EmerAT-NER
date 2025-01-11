@@ -17,6 +17,7 @@ from DataSet import DataSet
 from model.DataManager import DataManager
 
 import utils.metric as MetricUtil
+import conf.cfg
 
 # todo 下面待注释？？
 # tf.disable_eager_execution()
@@ -25,6 +26,9 @@ import utils.metric as MetricUtil
 from model import mtl_model
 # from utils.common import CommonUtil
 import utils.logger as logger
+
+from tensorflow.keras import backend as K
+K.clear_session()
 
 class Setting(object):
     def __init__(self):
@@ -39,13 +43,17 @@ class Setting(object):
 
         self.checkpoints_dir = './ckpt/ner-cws-2025-01-10'
         self.checkpoint_name = 'model'
-        self.huggingface_tag = '/Users/didi/Desktop/KYCode/huggingface/Bert/bert-base-chinese'
+        self.pretrained_model_name = 'bert-base-chinese'
+
+        # self.huggingface_tag = '/Users/didi/Desktop/KYCode/huggingface/bert-base-chinese'
+        # self.huggingface_tag = 'E:\\ARearchCode\\huggingface\\bert-base-chinese'
+
         self.is_early_stop = True
         self.patience = 50
 
         # common train parameter
         self.epoches = 30
-        self.batch_size = 20
+        self.batch_size = 16
         # self.num_steps 通常表示输入序列的固定最大长度，不足的补padding，多的截断
         self.num_steps = 300
         self.lr = 0.001
@@ -63,9 +71,12 @@ class Setting(object):
         self.keep_prob_tgt = 0.7
 
 class TrainMtl:
-    def __init__(self,setting,logger):
+    def __init__(self,setting,conf,logger):
         self.setting = setting
         self.logger = logger
+        self.conf = conf
+        self.setting.huggingface_tag = os.path.join(self.conf.huggingface_dir, self.setting.pretrained_model_name)
+
         # self.initializer = tfv2.keras.initializers.GlorotUniform()
 
         self.datamanager_src = DataManager(self.setting, self.setting.dataset_src)
@@ -285,10 +296,10 @@ if __name__ == "__main__":
                 tfv2.config.experimental.set_memory_growth(gpu, True)
         except RuntimeError as e:
             print(e)
-
+    conf = conf.cfg.get_cfg_by_os()
     logger = logger.get_logger('./log')
     setting = Setting()
     if not os.path.exists(setting.checkpoints_dir):
         os.makedirs(setting.checkpoints_dir)
 
-    TrainMtl(setting,logger).train()
+    TrainMtl(setting,conf,logger).train()
