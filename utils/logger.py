@@ -1,8 +1,11 @@
 import datetime
 import logging
+import os
 
 
 def get_logger(log_dir):
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
     log_file = log_dir + '/' + (datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S.log'))
     logger = logging.getLogger(__name__)
     logger.setLevel(level=logging.INFO)
