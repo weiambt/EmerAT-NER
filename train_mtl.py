@@ -17,6 +17,7 @@ from DataSet import DataSet
 from model.DataManager import DataManager
 
 import utils.metric as MetricUtil
+import utils.tool as Tool
 import conf.cfg
 
 # todo 下面待注释？？
@@ -38,8 +39,8 @@ class Setting(object):
 
         # dataset config
         self.dataset_src = DataSet("people")
-        self.dataset_tgt = DataSet("people2")
-        self.less_data_flag = True
+        self.dataset_tgt = DataSet("emergency_2024_4_14")
+        self.less_data_flag = False
 
         self.checkpoints_dir = './ckpt/ner-cws-2025-01-10'
         self.checkpoint_name = 'model'
@@ -52,8 +53,8 @@ class Setting(object):
         self.patience = 50
 
         # common train parameter
-        self.epoches = 30
-        self.batch_size = 16
+        self.epoches = 100
+        self.batch_size = 10
         # self.num_steps 通常表示输入序列的固定最大长度，不足的补padding，多的截断
         self.num_steps = 300
         self.lr = 0.001
@@ -79,8 +80,8 @@ class TrainMtl:
 
         # self.initializer = tfv2.keras.initializers.GlorotUniform()
 
-        self.datamanager_src = DataManager(self.setting, self.setting.dataset_src)
-        self.datamanager_tgt = DataManager(self.setting,self.setting.dataset_tgt)
+        self.datamanager_src = DataManager(self.logger,self.setting, self.setting.dataset_src)
+        self.datamanager_tgt = DataManager(self.logger,self.setting, self.setting.dataset_tgt)
 
         self.pretrained_model = TFBertModel.from_pretrained(self.setting.huggingface_tag, from_pt=True)
         self.ner_model = mtl_model.TransferModel(self.setting, self.datamanager_src,self.datamanager_tgt)
@@ -185,6 +186,9 @@ class TrainMtl:
                     else:
                         self.global_step_tgt.assign_add(1)
 
+                    # val_f1_avg, val_res_str = self.validate(dev_dataset_tgt)
+                    # return
+
             # 每个epoch后验证模型
             val_f1_avg, val_res_str = self.validate(dev_dataset_tgt)
             time_exec = (time.time() - start_time) / 60
@@ -213,7 +217,7 @@ class TrainMtl:
     def validate(self, val_dataset):
         # validation
         num_val_iterations = int(math.ceil(1.0 * len(val_dataset) / self.setting.batch_size))
-        print('start evaluate engines...')
+        self.logger.info('start evaluate engines...')
         loss_values = []
         val_results = {}
         val_labels_results = {}
@@ -252,6 +256,11 @@ class TrainMtl:
             for k, v in measures.items():
                 val_results[k] += v
             for lab in lab_measures:
+                if lab not in val_labels_results:
+                    val_labels_results.setdefault(lab, {})
+                    for measure in measuring_metrics:
+                        if measure != 'accuracy':
+                            val_labels_results[lab][measure] = 0
                 for k, v in lab_measures[lab].items():
                     val_labels_results[lab][k] += v
             loss_values.append(val_loss)
@@ -269,7 +278,7 @@ class TrainMtl:
                 val_labels_results[label][k] /= num_val_iterations
                 val_label_str += (k + ': %.3f ' % val_labels_results[label][k])
             info = ('label: %s, %s' % (label, val_label_str))
-            print(info)
+            self.logger.info(info)
         return val_f1_avg, val_res_str
 
         # 词表embedding
@@ -301,5 +310,6 @@ if __name__ == "__main__":
     setting = Setting()
     if not os.path.exists(setting.checkpoints_dir):
         os.makedirs(setting.checkpoints_dir)
-
+    logger.info("================Setting===================")
+    Tool.print_vars(logger,setting)
     TrainMtl(setting,conf,logger).train()
