@@ -8,6 +8,13 @@ import tensorflow.compat.v1 as tf
 # tf.disable_v2_behavior()
 import tensorflow_addons as tfa
 
+# 尝试解决服务器使用GPU报错
+from tensorflow.compat.v1 import ConfigProto
+from tensorflow.compat.v1 import InteractiveSession
+config = ConfigProto()
+config.gpu_options.allow_growth = True
+session = InteractiveSession(config=config)
+
 class TransferModel(tfv2.keras.Model):
     def __init__(self,setting,datamanager_src,datamanager_tgt):
         super(TransferModel, self).__init__()
