@@ -18,7 +18,8 @@ def metrics(X, y_true, y_pred, data_manager):
     y_pred = y_pred.numpy()
     y_true = y_true.numpy()
     X = X.numpy()
-    decode_out = open('/Users/didi/Desktop/KYCode/EmerAT-NER/decode_out.txt', "w")
+    # decode_out = open('/Users/didi/Desktop/KYCode/EmerAT-NER/decode_out.txt', "w")
+    decode_out = open('E:\\ARearchCode\\EmerAT-NER\\decode_out.txt', "w",encoding='utf8')
 
     for i in range(len(y_true)):
         x = data_manager.tokenizer.convert_ids_to_tokens(X[i].tolist(), skip_special_tokens=True)
@@ -158,7 +159,7 @@ def extract_entity(x, y, data_manager):
 
 def compute_f1():
     ans = 0
-    with open("/Users/didi/Desktop/KYCode/EmerAT-NER/decode_out_1.txt","r") as f:
+    with open("/Users/didi/Desktop/KYCode/EmerAT-NER/decode_out_1.txt","r",encoding="utf8") as f:
         for line in f:
 
             arr = line.strip().split()

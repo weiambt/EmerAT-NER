@@ -21,7 +21,7 @@ num_steps=300
 # 加载传统词嵌入：Word2Vec
 def load_embedding(setting):
     print('reading chinese word embedding.....')
-    f = open('./data/embed.txt','r')
+    f = open('./data/embed.txt','r',encoding='utf8')
     f.readline()
     while True:
         content=f.readline()
@@ -116,7 +116,7 @@ def process_test_data(setting):
     test_word=[]
     test_label=[]
     test_length=[]
-    f=open('data/weiboNER_test.csv', 'r')
+    f=open('data/weiboNER_test.csv', 'r',encoding='utf8')
     test_word.append([])
     test_label.append([])
     test_max_len=0
