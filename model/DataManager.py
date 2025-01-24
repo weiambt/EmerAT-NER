@@ -59,7 +59,7 @@ class DataManager:
         y_train = y
         att_mask_train = att_mask
         X_val, y_val, att_mask_val = self.get_dev_data(less_data_flag)
-        self.logger('training set size: {}, validating set size: {}'.format(len(X_train), len(X_val)))
+        self.logger.info('training set size: {}, validating set size: {}'.format(len(X_train), len(X_val)))
         # write('training set size: {}, validating set size: {}'.format(len(X_train), len(X_val)))
         train_dataset = tfv2.data.Dataset.from_tensor_slices((X_train, y_train, att_mask_train))
         val_dataset = tfv2.data.Dataset.from_tensor_slices((X_val, y_val, att_mask_val))

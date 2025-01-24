@@ -12,8 +12,7 @@ class WindowsConfig:
 
 class LinuxConfig:
     def __init__(self):
-        pass
-        # self.huggingface_dir = 'E:\\ARearchCode\\huggingface'
+        self.huggingface_dir = '/share/home/MP2209128/huggingface'
 
 def get_os():
     system = platform.system()
