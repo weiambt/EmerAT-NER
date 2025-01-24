@@ -1,3 +1,8 @@
+# 2025-01-24 20:57:13
+label2id.txt
+*.npy
+MarsCode*.xml
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
