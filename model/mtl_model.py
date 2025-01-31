@@ -1,3 +1,4 @@
+# from safetensors import paddle
 
 import base_model
 import tensorflow as tfv2
@@ -71,9 +72,20 @@ class TransferModel(tfv2.keras.Model):
         self.logits_W_src = tfv2.keras.layers.Dense(self.tags_num_src, name="logits_W_src")
         self.logits_W_tgt = tfv2.keras.layers.Dense(self.tags_num_tgt, name="logits_W_tgt")
 
+        # 线性变化成标量
+        self.linear_layer =  tf.keras.layers.Dense(1, activation=None)
+
         # todo 这里先不改
         self.dropout_src = tfv2.keras.layers.Dropout(rate=1 - self.keep_prob_src)
         self.dropout_tgt = tfv2.keras.layers.Dropout(rate=1 - self.keep_prob_tgt)
+
+        # 同方差
+        self.log_var2s = tfv2.Variable(tf.zeros([self.task_num], dtype=tf.float32))
+        # x = paddle.zeros([self.task_num], dtype='float32')
+        # self.log_var2s = paddle.create_parameter(
+        #     shape=x.shape,
+        #     dtype=str(x.numpy().dtype),
+        #     default_initializer=paddle.nn.initializer.Assign(x))
 
 
     @tfv2.function
@@ -156,9 +168,9 @@ class TransferModel(tfv2.keras.Model):
         # self.loss=tf.cast(self.is_ner,tf.float32)*self.ner_loss+tf.cast((1-self.is_ner),tf.float32)*self.cws_loss+self.adv_weight*self.adv_loss
 
         if self.is_target is False:
-            self.loss = self.adv_loss * self.adv_weight + self.ner_loss_src
+            self.loss = self.adv_loss * self.adv_weight + self.balance_loss(0,self.ner_loss_src)
         else:
-            self.loss = self.adv_loss * self.adv_weight + self.ner_loss_tgt
+            self.loss = self.adv_loss * self.adv_weight + self.balance_loss(1,self.ner_loss_tgt)
 
         transition_params = self.transition_params_tgt if is_target else self.transition_params_src
         return self.ner_project_logits, transition_params, self.loss
@@ -303,8 +315,114 @@ class TransferModel(tfv2.keras.Model):
 
         logits = tfv2.matmul(feature, self.W_adv) + self.b_adv
         # minmiax将特征映射到[0,1]中：softmax分类到[0,1]中，用交叉熵计算损失
-        adv_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=self.task_label))
+        # if normal:
+        # adv_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=self.task_label))
+        # else:
+
+        adv_loss = tf.reduce_mean(self.focal_loss(logits, self.task_label))
+        # adv_loss = tf.reduce_mean(self.focal_loss(logits, self.task_label, alpha=self.focal_alpha, gamma=self.focal_gamma))
         return adv_loss
+
+    def focal_loss(self,logits, labels, weights=None, alpha=0.25, gamma=2):
+        # 将 logits 转换为概率分布
+        logits = tfv2.nn.softmax(logits, axis=1)
+
+        # 将 labels 转换为 float32 类型
+        labels = tfv2.cast(labels, dtype=tfv2.float32)
+
+        # 如果 labels 的维度小于 logits，则进行 one-hot 编码
+        if labels.shape.ndims < logits.shape.ndims:
+            labels = tfv2.one_hot(tfv2.cast(labels, dtype=tfv2.int32), depth=tfv2.shape(logits)[-1], axis=-1)
+
+        # 创建与 logits 相同形状的全零张量
+        zeros = tfv2.zeros_like(logits, dtype=logits.dtype)
+
+        # 计算正类和负类的 logits 概率
+        pos_logits_prob = tfv2.where(labels > zeros, labels - logits, zeros)
+        neg_logits_prob = tfv2.where(labels > zeros, zeros, logits)
+
+        # 计算 focal loss
+        cross_entropy = - alpha * (pos_logits_prob ** gamma) * tfv2.math.log(tfv2.clip_by_value(logits, 1e-8, 1.0)) \
+                        - (1 - alpha) * (neg_logits_prob ** gamma) * tfv2.math.log(tfv2.clip_by_value(1.0 - logits, 1e-8, 1.0))
+
+        # 如果有 weights，则加权
+        if weights is not None:
+            if weights.shape.ndims < logits.shape.ndims:
+                weights = tfv2.expand_dims(weights, axis=-1)
+            cross_entropy = cross_entropy * weights
+
+        # 返回最终的 cross entropy
+        return cross_entropy
+
+    # def mtl_loss(self, task_index, task_loss):
+    #     loss = 0
+    #     # 获取当前任务的对数方差
+    #     log_var2 = self.log_var2s[task_index]
+    #
+    #     # 计算当前任务的损失
+    #     pre = paddle.exp(-log_var2)  # 动态权重
+    #     loss = paddle.sum(pre * task_loss + log_var2, axis=-1)  # 动态平衡损失
+    #     return paddle.mean(loss)
+
+    def balance_loss(self, task_index, task_loss):
+        print("损失平衡----")
+        # 获取当前任务的对数方差
+        log_var2 = self.log_var2s[task_index]
+
+        # 计算动态权重
+        pre_weight = tfv2.exp(-log_var2)
+
+        # 计算加权损失和正则化项
+        weighted_loss = pre_weight * task_loss
+        regularization = log_var2
+
+        # 对加权损失和正则化项求和，并指定在最后一个维度上进行
+        total_loss = tfv2.reduce_sum(weighted_loss + regularization)
+
+        # 计算所有样本损失的平均值
+        mean_loss = tfv2.reduce_mean(total_loss)
+
+        return mean_loss
+
+    def focal_loss2(self,logits, labels, weights=None, alpha=0.25, gamma=2):
+        # 经过线性变化，得到标量
+        pt = self.linear_layer(logits)
+
+        # Step 1: 对 logits 进行 softmax 激活，转换为概率分布
+        logits = tf.nn.softmax(logits, axis=-1)
+
+        # Step 2: 将 labels 转换为浮点型张量，确保后续计算的一致性
+        labels = tf.cast(labels, dtype=tf.float32)
+
+        # Step 3: 如果 labels 的维度比 logits 的维度少（未进行 one-hot 编码），进行 one-hot 编码
+        # 假设 logits 的最后一维是类别数 depth
+        if labels.shape.ndims < logits.shape.ndims:
+            labels = tf.one_hot(labels, depth=tf.shape(logits)[-1])
+
+        # Step 4: 计算正样本和负样本的损失权重
+        # pos_logits_prob 是正样本的权重，用于计算正样本部分的 Focal Loss
+        # neg_logits_prob 是负样本的权重，用于计算负样本部分的 Focal Loss
+        pos_logits_prob = labels * (1 - logits)  # (1 - p_t) 对应正样本
+        neg_logits_prob = (1 - labels) * logits  # p_t 对应负样本
+
+        # Step 5: 计算正负样本的 Focal Loss
+        # 使用 gamma 对样本权重进行调整，使得低置信度样本的影响更大
+        # 使用 tf.math.log 和 tf.clip_by_value 来确保数值稳定性，避免 log(0) 的情况
+        cross_entropy = -alpha * (pos_logits_prob ** gamma) * tf.math.log(tf.clip_by_value(logits, 1e-8, 1.0)) \
+                        - (1 - alpha) * (neg_logits_prob ** gamma) * tf.math.log(
+            tf.clip_by_value(1 - logits, 1e-8, 1.0))
+
+        # Step 6: 如果提供了 weights，则对损失进行加权
+        if weights is not None:
+            # 如果 weights 的维度小于 logits 的维度，将其扩展为与 logits 的维度一致
+            if weights.shape.ndims < logits.shape.ndims:
+                weights = tf.expand_dims(weights, axis=-1)
+            # 将权重应用到损失上
+            cross_entropy = cross_entropy * weights
+
+        # Step 7: 计算最终损失
+        # 先对类别维度（最后一维）求和，再对样本维度求平均，返回一个标量损失值
+        return tf.reduce_mean(tf.reduce_sum(cross_entropy, axis=-1))
 
     def normalize(self, inputs):
         # 归一化参数：定义可训练参数 beta 和 gamma
