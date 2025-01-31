@@ -18,8 +18,9 @@ def metrics(X, y_true, y_pred, data_manager):
     y_pred = y_pred.numpy()
     y_true = y_true.numpy()
     X = X.numpy()
-    # decode_out = open('/Users/didi/Desktop/KYCode/EmerAT-NER/decode_out.txt', "w")
-    decode_out = open('E:\\ARearchCode\\EmerAT-NER\\decode_out.txt', "w",encoding='utf8')
+    # decode_out = open('/Users/didi/Desktop/KYCode/EmerAT-NER/decode_out.txt', "w",encoding='utf8')
+    # decode_out = open('E:\\ARearchCode\\EmerAT-NER\\decode_out.txt', "w",encoding='utf8')
+    # decode_out = open('./decode_out.txt', "w", encoding='utf8')
 
     for i in range(len(y_true)):
         x = data_manager.tokenizer.convert_ids_to_tokens(X[i].tolist(), skip_special_tokens=True)
@@ -29,15 +30,15 @@ def metrics(X, y_true, y_pred, data_manager):
                  val != data_manager.label2id[data_manager.PADDING]]  # if val != 5
         # print(i, len(y), len(x), len(y_hat))
         # 输出预测结果
-        xx = data_manager.tokenizer.convert_ids_to_tokens(X[i].tolist(),skip_special_tokens=False)
-        info = ''
-        # x中不包含CLS和SEP
-        for j in range(1,len(y)-1):
-            if y[j] != data_manager.label2id[data_manager.PADDING]:
-                info += '{} {} {}\n'.format(xx[j],y[j],y_hat[j])
-        info += "\n"
-        decode_out.write(info)
-        decode_out.flush()
+        # xx = data_manager.tokenizer.convert_ids_to_tokens(X[i].tolist(),skip_special_tokens=False)
+        # info = ''
+        # # x中不包含CLS和SEP
+        # for j in range(1,len(y)-1):
+        #     if y[j] != data_manager.label2id[data_manager.PADDING]:
+        #         info += '{} {} {}\n'.format(xx[j],y[j],y_hat[j])
+        # info += "\n"
+        # decode_out.write(info)
+        # decode_out.flush()
 
         correct_label_num += len([1 for a, b in zip(y, y_hat) if a == b])
         total_label_num += len(y)
@@ -90,7 +91,7 @@ def metrics(X, y_true, y_pred, data_manager):
         label_metrics[label]['precision'] = tmp_precision
         label_metrics[label]['recall'] = tmp_recall
         label_metrics[label]['f1'] = tmp_f1
-    decode_out.close()
+    # decode_out.close()
     results = {}
     for measure in measuring_metrics:
         results[measure] = vars()[measure]
