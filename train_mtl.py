@@ -40,7 +40,7 @@ class Setting(object):
         # dataset config
         self.dataset_src = DataSet("people")
         self.dataset_tgt = DataSet("emergency_2024_4_14")
-        self.less_data_flag = False
+        self.less_data_flag = True
 
         self.checkpoints_dir = './ckpt/ner-cws-2025-01-10'
         self.checkpoint_name = 'model'
