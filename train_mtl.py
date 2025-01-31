@@ -27,6 +27,7 @@ import conf.cfg
 from model import mtl_model
 # from utils.common import CommonUtil
 import utils.logger as logger
+import model.LossType as Loss
 
 from tensorflow.keras import backend as K
 K.clear_session()
@@ -42,9 +43,15 @@ class Setting(object):
         self.dataset_tgt = DataSet("emergency_2024_4_14")
         self.less_data_flag = True
 
-        self.checkpoints_dir = './ckpt/ner-cws-2025-01-10'
+        self.checkpoints_dir = './ckpt/BALANCE_advloss'
         self.checkpoint_name = 'model'
         self.pretrained_model_name = 'bert-base-chinese'
+
+        # 损失类型。[AT,FOCAL,BALANCE_advloss,BALANCE_crfloss]
+        # BALANCE_crfloss 默认使用focal loss作为对抗损失
+        self.loss_type = Loss.LossType.BALANCE_crfloss
+        self.focal_alpha = 0.1
+        self.focal_gamma = 2
 
         # self.huggingface_tag = '/Users/didi/Desktop/KYCode/huggingface/bert-base-chinese'
         # self.huggingface_tag = 'E:\\ARearchCode\\huggingface\\bert-base-chinese'
@@ -84,7 +91,7 @@ class TrainMtl:
         self.datamanager_tgt = DataManager(self.logger,self.setting, self.setting.dataset_tgt)
 
         self.pretrained_model = TFBertModel.from_pretrained(self.setting.huggingface_tag, from_pt=True)
-        self.ner_model = mtl_model.TransferModel(self.setting, self.datamanager_src,self.datamanager_tgt)
+        self.ner_model = mtl_model.TransferModel(self.logger,self.setting, self.datamanager_src,self.datamanager_tgt)
 
         self.optimizer = Adam(learning_rate=self.setting.lr)
         self.global_step_src = tfv2.Variable(0, name="global_step_src", trainable=False)
