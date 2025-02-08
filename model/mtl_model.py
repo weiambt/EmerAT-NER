@@ -204,7 +204,8 @@ class TransferModel(tfv2.keras.Model):
 
         # source lstm
         with tfv2.name_scope('source_bilstm'):
-            src_private_output = self.private_bilstm_src(shared_bilstm_output)
+            # ToDo 这里为什么用的是共享lstm的输出
+            src_private_output = self.private_bilstm_src(input)
             src_private_output = self.self_attention3(src_private_output)
 
         # common + private lstm + CRF
@@ -224,7 +225,7 @@ class TransferModel(tfv2.keras.Model):
             self.ner_loss_src = tf.reduce_mean(-ner_crf_loss)
 
         with tfv2.name_scope('target_bilstm'):
-            tgt_private_output = self.private_bilstm_tgt(shared_bilstm_output)
+            tgt_private_output = self.private_bilstm_tgt(input_tgt)
             tgt_private_output = self.self_attention3(tgt_private_output)
 
         # common + private lstm + CRF
@@ -237,8 +238,9 @@ class TransferModel(tfv2.keras.Model):
         ner_logits = self.logits_W_tgt(hidden_output_ner)
         self.ner_project_logits = tf.reshape(ner_logits, [-1, self.num_steps, self.tags_num_tgt])
         with tfv2.name_scope('ner_crf'):
-            ner_crf_loss, self.transition_params_tgt = tfa.text.crf_log_likelihood(self.ner_project_logits, label,
-                                                                               sent_len,
+            ner_crf_loss, self.transition_params_tgt = tfa.text.crf_log_likelihood(self.ner_project_logits,
+                                                                                   label_tgt,
+                                                                                sent_len_tgt,
                                                                                transition_params=self.transition_params_tgt)
             self.ner_loss_tgt = tf.reduce_mean(-ner_crf_loss)
 
