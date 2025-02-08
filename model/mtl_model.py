@@ -118,7 +118,7 @@ class TransferModel(tfv2.keras.Model):
         if self.is_target is False:
             # source lstm
             with tfv2.name_scope('source_bilstm'):
-                src_private_output = self.private_bilstm_src(shared_bilstm_output)
+                src_private_output = self.private_bilstm_src(input)
                 src_private_output = self.self_attention3(src_private_output)
             # common + private lstm + CRF
             output = tfv2.concat([src_private_output, shared_bilstm_output], axis=-1)
@@ -137,7 +137,7 @@ class TransferModel(tfv2.keras.Model):
                 self.ner_loss_src = tf.reduce_mean(-ner_crf_loss)
         else:
             with tfv2.name_scope('target_bilstm'):
-                tgt_private_output = self.private_bilstm_tgt(shared_bilstm_output)
+                tgt_private_output = self.private_bilstm_tgt(input)
                 tgt_private_output = self.self_attention3(tgt_private_output)
 
             # common + private lstm + CRF
@@ -178,7 +178,7 @@ class TransferModel(tfv2.keras.Model):
 
 
     @tfv2.function
-    def multi_task_init(self,input,sent_len,label,is_train,task_label):
+    def multi_task_init(self,is_train,input,sent_len,label,task_label,input_tgt,sent_len_tgt,label_tgt,task_label_tgt):
         """
             1. 为了初始化target的参数
             2、如果需要两个任务共同计算损失后，再传播，就用这个代码
