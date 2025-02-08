@@ -132,11 +132,17 @@ class TrainMtl:
                     embedding_inputs = self.pretrained_model(X_train_batch,
                                                              attention_mask=att_mask_batch)[0]
                     inputs_length_bacth = tfv2.math.count_nonzero(X_train_batch, 1)
+                    # 为了解决数据集数量不一致导致CRF报错的问题
+                    X_train_batch_tgt, y_train_batch_tgt, att_mask_batch_tgt = batch_tgt[1]
+                    embedding_inputs_tgt = self.pretrained_model(X_train_batch_tgt,
+                                                             attention_mask=att_mask_batch_tgt)[0]
+                    inputs_length_bacth_tgt = tfv2.math.count_nonzero(X_train_batch_tgt, 1)
 
 
-                    self.ner_model.multi_task_init(embedding_inputs,inputs_length_bacth,y_train_batch,
-                                                                                is_train=True,
-                                                                                task_label=self.task_label_src)
+                    self.ner_model.multi_task_init(True,
+                                                   embedding_inputs,inputs_length_bacth,y_train_batch,self.task_label_src,
+                                                   embedding_inputs_tgt, inputs_length_bacth_tgt, y_train_batch_tgt,self.task_label_tgt,
+                                                   )
 
                 # 枚举所有任务
                 for task in ["src","tgt"]:
