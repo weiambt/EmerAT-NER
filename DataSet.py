@@ -12,6 +12,8 @@ class DataSet(object):
             self.init_emergency_2025_2_1()
         elif dataset_name=='emergency_2025_2_4':
             self.init_emergency_2025_2_4()
+        elif dataset_name=='emergency_2025_2_8':
+            self.init_emergency_2025_2_8()
         elif dataset_name=='weibo':
             self.init_weibo()
         elif dataset_name=='cluener':
@@ -54,6 +56,13 @@ class DataSet(object):
         self.label2id_file = 'data/emergency_2025_2_4/label2id.txt'
         # self.suffix = ["TYPE","CLOSS","PLOSS"]
         self.suffix = ["TIME", "DLOC", "CLOSS", "OORG", "DATE", "OPER", "TYPE", "PORG", "LPER", "PLOSS", "PPER","LORG"]
+
+    def init_emergency_2025_2_8(self):
+        self.train_file = 'data/emergency_2025_2_8/train.csv'
+        self.dev_file = 'data/emergency_2025_2_8/dev.csv'
+        self.label2id_file = 'data/emergency_2025_2_8/label2id.txt'
+        # self.suffix = ["TYPE","CLOSS","PLOSS"]
+        self.suffix = ["TIME", "CLOSS", "OORG", "DATE", "OPER", "TYPE", "PORG", "LPER", "PLOSS", "PPER","LORG"]
 
     def init_weibo(self):
         self.train_file = 'data/weibo/train.csv'
