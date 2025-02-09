@@ -93,6 +93,8 @@ class DataManager:
                 # 循环到了句子末尾时，处理
                 if str(token) == str(np.nan):
                     if len(tmp_x) <= self.max_sequence_length - 2:
+                        # todo 如果加载数据集报错，可以打开下面的代码看是哪一行报错
+                        # print(tmp_x)
                         # 这里返回会多了 [CLS] 和 [SEP]，token_id分别是101，102
                         tmp_x = self.tokenizer.encode(tmp_x)
                         tmp_att_mask = [1] * len(tmp_x)
